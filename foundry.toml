@@ -3,7 +3,8 @@ src = "src"
 out = "out"
 libs = ["lib"]
 remappings = [
-  "@balancer-labs/v2-interfaces=lib/balancer-v2-monorepo/pkg/interfaces"
+  "@balancer-labs/v2-interfaces=lib/balancer-v2-monorepo/pkg/interfaces",
+  "@uniswap/v3-core=lib/v3-core"
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

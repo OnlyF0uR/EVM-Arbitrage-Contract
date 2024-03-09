@@ -5,11 +5,10 @@ import "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
 import "@balancer-labs/v2-interfaces/contracts/vault/IFlashLoanRecipient.sol";
 import "@balancer-labs/v2-interfaces/contracts/solidity-utils/openzeppelin/IERC20.sol";
 
-import "./interfaces/ISwapRouter.sol";
-import "./interfaces/IUniswapV2Router02.sol";
-import "./libraries/TransferHelper.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 
-contract Arbitrage is IFlashLoanRecipient  {
+contract Arbitrage is IFlashLoanRecipient, IUniswapV3SwapCallback  {
   IVault private immutable vault;
   address private immutable minter;
 
@@ -34,40 +33,29 @@ contract Arbitrage is IFlashLoanRecipient  {
     _;
   }
 
-  function swapV3(address _pool, address _in, address _out, uint24 _fee, uint256 _amount, uint160 _sqrtPriceLimitX96) public returns (uint256) {
-    require(_amount > 0, "V3: NA");
-    require(IERC20(_in).balanceOf(address(this)) >= _amount, "V3: NEF"); // Not enough funds
-    IERC20(_in).approve(address(_router), _amount);
-
-    IUniswapV3Pool pool = IUniswapV3Pool(_pool);
-    pool.swap(
-      address(this),
-      // The direction of the swap, true for token0 to token1, false for token1 to token0
-      _amount > 0,
-      // The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
-      _amount > 0 ? _amount : -_amount,
-      // The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this
-      // value after the swap. If one for zero, the price cannot be greater than this value after the swap
-      _sqrtPriceLimitX96,
-      // Any data to be passed through to the callback
-      ""
-    );
+  function execute(ArbitInfo memory _meta, uint256 _amount) external {
+    // ...
   }
 
-    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes data) external {}
+  function collect(address _token, address _receiver) external minterOnly {
+    uint256 bal = IERC20(_token).balanceOf(address(this));
+    require(bal > 0, "CO: NEF"); // Not enough funds
 
-    function swapV2(address _router, address _in, address _out, uint256 _amount) public returns (uint256) {
-        require(_amount > 0, "V2: NA");
-        require(IERC20(_in).balanceOf(address(this)) >= _amount, "V2: NEF");
+    IERC20(_token).transfer(_receiver, bal);
+  }
 
-        TransferHelper.safeApprove(_in, address(_router), _amount);
+  function receiveFlashLoan(IERC20[] memory tokens, uint256[] memory amounts, uint256[] memory feeAmounts, bytes memory userData) external override {
+    // ...
+  }
+  
+  ISwapRouter constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
-        address[] memory path = new address[](2);
-        path[0] = _in;
-        path[1] = _out;
+  function swapV3(address _pool, address _in, int256 _amount, uint160 _sqrtPriceLimitX96) public {
+    require(_amount != 0, "NA"); // Nought amount 
+    require(IERC20(_in).balanceOf(address(this)) >= uint256(_amount), "NEF"); // Not enough funds
 
-        require(IERC20(_in).approve(_router, _amount), "V2: AF"); // Approval failed
-        uint[] memory output = IUniswapV2Router02(_router).swapExactTokensForTokens(_amount, 0, path, msg.sender, block.timestamp);
-        return output[0];
-    }
+
+  }
+
+  function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {}
 }
