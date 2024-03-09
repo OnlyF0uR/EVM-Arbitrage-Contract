@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib"]
 remappings = [
   "@balancer-labs/v2-interfaces=lib/balancer-v2-monorepo/pkg/interfaces",
+  "@uniswap/v3-core=lib/v3-core",
   "@uniswap/v3-periphery=lib/v3-periphery",
   "@uniswap/v2-periphery=lib/v2-periphery"
 ]
