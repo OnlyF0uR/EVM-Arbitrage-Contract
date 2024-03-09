@@ -42,7 +42,7 @@ contract ArbitrageTest is Test {
 
     function testFlashLoan() public {
       uint256 balanceBefore = IERC20(WETH).balanceOf(address(arbit));
-      console2.log("WEHT balance before flash loan", balanceBefore);
+      console2.log("WETH balance before flash loan", balanceBefore);
 
       Arbitrage.Info memory _meta;
       _meta.tokenToBorrow = WETH;
@@ -59,7 +59,7 @@ contract ArbitrageTest is Test {
       arbit.execute(_meta, 5e17);
 
       uint256 balanceAfter = IERC20(WETH).balanceOf(address(arbit));
-      console2.log("WEHT balance after flash loan", IERC20(WETH).balanceOf(address(arbit)));
+      console2.log("WETH balance after flash loan", IERC20(WETH).balanceOf(address(arbit)));
 
       console2.log("WETH diff (0.00)", balanceBefore - balanceAfter);
 
