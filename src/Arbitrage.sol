@@ -34,68 +34,29 @@ contract Arbitrage is IFlashLoanRecipient  {
     _;
   }
 
-  function execute(ArbitInfo memory _meta, uint256 _amount) external {
-    IERC20[] memory tokens = new IERC20[](1);
-    tokens[0] = IERC20(_meta.buy.tokenIn);
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = _amount;
+  function swapV3(address _pool, address _in, address _out, uint24 _fee, uint256 _amount, uint160 _sqrtPriceLimitX96) public returns (uint256) {
+    require(_amount > 0, "V3: NA");
+    require(IERC20(_in).balanceOf(address(this)) >= _amount, "V3: NEF"); // Not enough funds
+    IERC20(_in).approve(address(_router), _amount);
 
-    bytes memory userData = abi.encode(_meta);
-    vault.flashLoan(this, tokens, amounts, userData);
+    IUniswapV3Pool pool = IUniswapV3Pool(_pool);
+    pool.swap(
+      address(this),
+      // The direction of the swap, true for token0 to token1, false for token1 to token0
+      _amount > 0,
+      // The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
+      _amount > 0 ? _amount : -_amount,
+      // The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this
+      // value after the swap. If one for zero, the price cannot be greater than this value after the swap
+      _sqrtPriceLimitX96,
+      // Any data to be passed through to the callback
+      ""
+    );
   }
 
-  function collect(address _token, address _receiver) external minterOnly {
-    uint256 bal = IERC20(_token).balanceOf(address(this));
-    require(bal > 0, "CO: NEF"); // Not enough funds
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes data) external {}
 
-    TransferHelper.safeTransfer(_token, _receiver, bal);
-  }
-
-  function receiveFlashLoan(IERC20[] memory tokens, uint256[] memory amounts, uint256[] memory feeAmounts, bytes memory userData) external override {
-    require(msg.sender == address(vault), "MC");
-
-    ArbitInfo memory meta = abi.decode(userData, (ArbitInfo));
-    require(address(tokens[0]) == meta.buy.tokenIn, "TNE");
-    
-    uint256 sellAmount;
-    if (meta.buy.isLegacy) {
-      sellAmount = swapV2(meta.buy.poolAddress, meta.buy.tokenIn, meta.sell.tokenIn, amounts[0]);
-    } else {
-      sellAmount = swapV3(meta.buy.poolAddress, meta.buy.tokenIn, meta.sell.tokenIn, meta.buy.poolFee, amounts[0]);
-    }
-
-    if (meta.sell.isLegacy) {
-      swapV3(meta.sell.poolAddress, meta.sell.tokenIn, meta.buy.tokenIn, meta.sell.poolFee, sellAmount);
-    } else {
-      swapV3(meta.sell.poolAddress, meta.sell.tokenIn, meta.buy.tokenIn, meta.sell.poolFee, sellAmount);
-    }
-
-    uint256 totalDebt = amounts[0] + feeAmounts[0];
-    IERC20(meta.buy.tokenIn).transfer(address(vault), totalDebt);
-  }
-
-  function swapV3(address _router, address _in, address _out, uint24 _fee, uint256 _amount) private returns (uint256) {
-        require(_amount > 0, "V3: NA");
-        require(IERC20(_in).balanceOf(address(this)) >= _amount, "V3: NEF"); // Not enough funds
-        
-        TransferHelper.safeApprove(_in, address(_router), _amount);
-
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-            tokenIn: _in,
-            tokenOut: _out,
-            fee: _fee,
-            recipient: msg.sender,
-            deadline: block.timestamp,
-            amountIn: _amount,
-            amountOutMinimum: 0,
-            sqrtPriceLimitX96: 0
-        });
-
-        uint256 output = ISwapRouter(_router).exactInputSingle(params);
-        return output;
-    }
-
-    function swapV2(address _router, address _in, address _out, uint256 _amount) private returns (uint256) {
+    function swapV2(address _router, address _in, address _out, uint256 _amount) public returns (uint256) {
         require(_amount > 0, "V2: NA");
         require(IERC20(_in).balanceOf(address(this)) >= _amount, "V2: NEF");
 
