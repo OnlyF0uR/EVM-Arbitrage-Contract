@@ -5,10 +5,9 @@ import "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
 import "@balancer-labs/v2-interfaces/contracts/vault/IFlashLoanRecipient.sol";
 import "@balancer-labs/v2-interfaces/contracts/solidity-utils/openzeppelin/IERC20.sol";
 
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
-contract Arbitrage is IFlashLoanRecipient, IUniswapV3SwapCallback  {
+contract Arbitrage is IFlashLoanRecipient  {
   IVault private immutable vault;
   address private immutable minter;
 
@@ -48,14 +47,44 @@ contract Arbitrage is IFlashLoanRecipient, IUniswapV3SwapCallback  {
     // ...
   }
   
-  ISwapRouter constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+  ISwapRouter constant v3Router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+  
+  function performV3Swap(
+      address tokenIn,
+      address tokenOut,
+      uint24 poolFee,
+      uint256 amountIn
+  ) external returns (uint256 amountOut) {
+    IERC20(tokenIn).approve(address(v3Router), amountIn);
 
-  function swapV3(address _pool, address _in, int256 _amount, uint160 _sqrtPriceLimitX96) public {
-    require(_amount != 0, "NA"); // Nought amount 
-    require(IERC20(_in).balanceOf(address(this)) >= uint256(_amount), "NEF"); // Not enough funds
+    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: poolFee,
+      recipient: address(this),
+      deadline: block.timestamp,
+      amountIn: amountIn,
+      amountOutMinimum: 0,
+      sqrtPriceLimitX96: 0
+    });
 
-
+    amountOut = v3Router.exactInputSingle(params);
   }
 
-  function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {}
+  IUniswapV2Router private v2Router = IUniswapV2Router(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+
+  function performV2Swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin) external returns (uint256 amountOut) {
+    IERC20(tokenIn).approve(address(v2Router), amountIn);
+
+    address[] memory path;
+    path = new address[](2);
+    path[0] = tokenIn;
+    path[1] = tokenOut;
+    
+    uint256[] memory amounts = v2Router.swapExactTokensForTokens(
+      amountIn, amountOutMin, path, address(this), block.timestamp
+    );
+
+    return amounts[1];
+  }
 }

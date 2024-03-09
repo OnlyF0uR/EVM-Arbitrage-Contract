@@ -24,11 +24,22 @@ contract ArbitrageTest is Test {
         give: 100e18
       });
 
-      console2.log("WETH balance", IERC20(WETH).balanceOf(address(arbit)));
+      console2.log("WETH balance before swaps", IERC20(WETH).balanceOf(address(arbit)));
     }
 
     function testV3Swap() public {
-      arbit.swapV3(WETH_MATIC_POOL, WETH, 2e18, 0);
-      assertGe(IERC20(WMATIC).balanceOf(address(this)), 0, "SF");
+      uint256 result = arbit.performV3Swap(WETH, WMATIC, 500, 1e18);
+      console2.log("WMATIC balance after v3 swap", result);
+
+      assertGt(IERC20(WMATIC).balanceOf(address(arbit)), 0);
+    }
+
+    function testV2Swap() public {
+      uint256 before = IERC20(WMATIC).balanceOf(address(arbit));
+
+      uint256 result = arbit.performV2Swap(WETH, WMATIC, 1e18, 1);
+      console2.log("WMATIC balance after v2 swap", result);
+
+      assertGt(IERC20(WMATIC).balanceOf(address(arbit)), before);
     }
 }
